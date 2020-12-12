@@ -1,0 +1,732 @@
+\documentclass[times, twocolumn]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}
+\usepackage{graphicx}
+\usepackage{sectsty}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{enumitem}
+\usepackage{fourier}
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{hyperref}
+
+
+\renewcommand\theadalign{bc}
+\renewcommand\theadfont{\bfseries}
+\renewcommand\theadgape{\Gape[4pt]}
+\renewcommand\cellgape{\Gape[4pt]}
+
+\setlist{nosep}
+\newcommand*{\justifyheading}{\raggedright}
+\setlength{\columnsep}{0.4in}
+\sectionfont{\fontsize{12}{10}\selectfont}
+
+\renewenvironment{abstract}
+ {\large
+  \begin{center}
+  \bfseries \abstractname\vspace{-.5em}\vspace{0pt}
+  \end{center}
+    \small
+  \list{}{%
+    \setlength{\leftmargin}{5mm}% <---------CHANGE HERE
+    \setlength{\rightmargin}{\leftmargin}%
+  }%
+  \item\relax}
+ {\endlist}
+
+\title{\textbf{{\Large Investigating the Dynamic Between Mental Health and the Tech Industry}}}
+
+\author{
+    \normalsize
+    \textbf{Brittany Stenekes} \\
+    \normalsize
+    Cornell University \\
+    \normalsize
+    {\fontfamily{pcr}\selectfont bss99@cornell.edu }
+
+    \and
+    \normalsize
+    \normalsize
+    \textbf{William Xiao} \\
+    \normalsize
+    Cornell University \\
+    \normalsize
+    {\fontfamily{pcr}\selectfont wmx2@cornell.edu }
+
+    \and
+    \normalsize
+    \textbf{Sami Smalling} \\
+    \normalsize
+    Cornell University \\
+    \normalsize
+    {\fontfamily{pcr}\selectfont ss2676@cornell.edu }
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+Mental health is a serious issue which is garnering more attention given the
+movement to virtual work and schooling due to the pandemic. In particular, the
+tech industry is known for heavily stigmatizing the subject. In this report, we
+discuss what kinds of factors make one more likely to need or seek treatment for
+mental health. We show our methods for missing value imputation, as well as the
+models we used to try and fit the data. We also reflect on whether these models
+did well, our confidence in using them in a production setting, and also whether
+the results of this project might be used as a weapon of math destruction.
+\end{abstract}
+
+\fontsize{9.5}{9}\selectfont
+
+\fontsize{10}{12}\selectfont
+
+\section{Problem Description}
+Mental health has become an ever-present issue in modern society. With Americans
+working harder than ever, with constant stressors looming over, it is easy for
+those with such burdens to become overwhelmed, and not know how to proceed.
+As such, the mental health of those suffering may often tend to decrease. Mental
+health has become even more important these past few years, with mental health
+organizations and efforts on the rise. Given the pandemic, people being isolated
+and working from home only compounds this issue of potentially deteriorating mental
+state. In this project, we attempt to discover what kinds of factors contribute
+to one’s involvement with mental health, and whether one seeks treatment for
+issues or not.
+
+\section{Descriptive Statistics}
+
+Data from surveys filled out in 2017-2019 were combined into a full dataset with
+1,525 examples. The most pertinent questions were selected to go into the cleaned
+dataset, which now has 29 features. These questions were about the respondent’s
+demographics, their mental health status, their comfortability discussing mental
+health, and how their workplace considers mental health concerns. Questions
+that were removed included repeated questions or ones relating to a previous
+employer. There were a few questions that were emphasized in bold in the survey,
+and these questions were in general the ones included in our cleaned dataset.
+
+We extracted basic statistics from the survey responses regarding employment type
+and environments from the combined survey results from 2017 to 2019. We first
+examined the age of survey participants, generating the following histograms.
+Since the distributions are very similar, we cannot conclude that age is a
+relevant metric to use in model fitting.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{age.png}
+    \caption{Age vs. Diagnosis}
+    \label{fig:age}
+\end{figure}
+
+62\% of the participants are employed in a tech role, with half of all participants
+working for a tech company. About half of the tech employees-- illustrated by the
+light blue bars in Figure \ref{fig:respondent} have been diagnosed with a mental
+illness. Half of the participants sometimes work remotely, while 25\% always work
+remotely. Whether or not remote work contributes to mental health illness in the
+workplace is a factor we will consider in our further model fitting and analysis
+because remote work has become so prevalent among companies in 2020, due to COVID-19.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{respondent_employment_env.png}
+    \caption{Respondent Employment Environment.}
+    \label{fig:respondent}
+\end{figure}
+
+Next, we separated the participants into two mutually exhaustive and exclusive
+groups: people who have been diagnosed with a mental illness and people who have
+not. As Figure \ref{fig:comfortability_mh} shows, people who have not been diagnosed
+with a mental illness are less comfortable talking about mental health issues
+compared to people who have been diagnosed with a disorder.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{comfortability_mh.png}
+    \caption{Comfortability of discussing mental health issues by diagnosis.}
+    \label{fig:comfortability_mh}
+\end{figure}
+
+When analyzing data quality, we found that there are corrupted NaN values
+throughout the table, including in basic fields such as age, race, and gender.
+ There are several optional survey questions that some did not choose to answer,
+ including “Would you bring up mental health issues in an interview? Why or why
+ not?”, so the entries for those rows are missing. The most critical columns have
+ <1\% of the data missing. The average is around 14-50\% missing, and the most
+ is around 80\%.
+
+There were also plenty of messy values in the gender column, including misspellings
+that were reminiscent of uncleaned text-to-speech (‘uhhhhhh genderqueer’),
+making for tens of different options that had to be cleaned down to one of
+‘M’, ‘F’, and ‘Nonbinary’. There were few enough distinct values that this could
+be cleaned manually. The rest of the columns did not need to be cleaned too heavily.
+
+
+\section{Preliminary Analysis}
+
+We extracted demographic information about the survey participants and found that,
+of the respondents who work for a tech company, or in a tech role, about 28\% of
+the respondents were female, 64\% male, and the remaining 8\% identified as another
+gender. 53\% of the female tech employees have been diagnosed with a mental health
+disorder, while 38\% of the men, and 7\% of the remaining tech employees have been
+diagnosed with a mental health disorder. These basic statistics motivate us to
+explore the possibility that females in tech are more prone to mental health
+disorders than males. Although, it could also be the case that females are more
+comfortable seeking professional mental health diagnoses than males.
+
+We also examined workplace comfortability according to gender.
+
+
+These results are
+synthesized in table \ref{table:comfort-percentage-table}.
+
+\definecolor{GoodGreen}{HTML}{008000}
+
+\begin{table}
+    \centering
+    \begin{tabular}{lrr}
+        \hline \textbf{Gender} & \textbf{Coworkers} & \textbf{Supervisor(s)} \\ \hline
+        Female & \textcolor{red}{19.8\%} & 31.8\% \\
+        Male & \textcolor{red}{20.8\%} & 30.4\% \\
+        Other & 28.0\% & \textcolor{GoodGreen}{40.2\%} \\
+        \hline
+    \end{tabular}
+    \caption{
+        Percentage of tech employees who feel comfortable talking to other groups
+        about mental health, organized by gender.
+    }
+    \label{table:comfort-percentage-table}
+\end{table}
+
+All percentages in the table above are 40\% or less, suggesting most people who
+work in the tech industry do not feel comfortable talking about mental health.
+Both males and females feel especially uncomfortable talking to their coworkers
+about their mental health concerns.
+
+We then performed a similar analysis of comfortability discussing mental health
+for participants who identified as White or Caucasian, Asian, Hispanic, Black,
+or African American. 60\% of people who identified as Black or African American,
+answered “Yes” to only 1 question asking about their comfort in discussing
+mental illness. About half of the people who identified as White answered
+“No” to all of the questions. There were mixed responses among people who identified
+as either Asian or Hispanic. About 3\% of these people answered “No” to all
+questions, while 15\% answered “Yes” at least 75\% of the time. Based on these
+results illustrated in the plot below, it is clear that very few people are
+comfortable discussing mental health in their workplace.
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.38\textwidth]{comfortability_race.png}
+    \caption{Comfortability of discussing mental health issues by race.}
+    \label{fig:comfortability_race}
+\end{figure}
+
+
+In summary, our initial data explorations generated the following ideas which
+will be useful in moving forward:
+
+\begin{itemize}
+    \item Mental illness seems common in the tech industry: About 1 in 2 tech
+    employees who participated have been diagnosed with a mental health illness.
+
+    \item Most people are uncomfortable discussing mental health issues during
+    an interview or with their coworkers or supervisors.
+
+    \item There is not a noticeable difference between the comfortability of
+    males versus females. However, of the participants in the tech industry,
+    15\% more females have been diagnosed with a mental health issue when
+    compared to males.
+
+    \item There are about the same proportions of participants with mental
+    illnesses across age groups. Age does not appear to be an important factor
+    to consider in model fitting.
+
+    \item Few people who identified as White, Black, or African American are
+    comfortable discussing mental health issues in any circumstances.
+    Comparatively, people who identified as Asian or Hispanic had more mixed opinions.
+    Therefore, we think ethnicity could potentially be useful in model fitting,
+    although we understand that survey different respondents have different past
+    experiences that are not necessarily captured by survey results.
+
+\end{itemize}
+
+
+\section{Techniques Used}
+
+\subsection{Missing Value Imputation}
+
+Because this project involves working with survey data that had roughly 20\%
+missing values, imputation was essential before moving forward with constructing
+models. Two different imputed datasets were created using different imputation
+techniques which were compared while evaluating model performance. The features
+were broken down into five distinct groups: real-valued features, boolean features,
+categorical features, ordinal features, and those with values that were not imputed
+(such as long-form text data, the country and state where the participant lives
+and works, and their gender and race). The unimputed features were chosen because
+there are categories within those features that could potentially not be within
+the observed data. For example, there could be participants from countries not
+listed within the countries observed in the dataset.
+
+In both datasets, boolean features were cleaned by converting to binaries and
+ordinal features were encoded as factors, with NaN values intact.
+
+
+\begin{table*}[t]
+    \centering
+    \begin{tabular}{lrr}
+        \hline \textbf{Dataset} & \textbf{Ordinal / Boolean/ Real values} & \thead{Categorical Values} \\ \hline
+        Set 1 & KNN imputation (n=3), rounded & \makecell{Most common element used to fill in missing data in each column} \\
+        Set 2 & KNN imputation (n=3), rounded & \makecell{Converted to a one-hot encoded dataset, KNN imputation (n=3), \\ then rounded and converted back separately from other data} \\
+        \hline
+    \end{tabular}
+    \caption{
+        Breakdown of imputation treatment for each dataset created.
+    }
+    \label{table:imputation-treatment}
+\end{table*}
+
+In all three datasets, ordinal, real-valued, and boolean data were all imputed
+using KNN nearest neighbors imputation, using sklearn’s \texttt{KNNImpute}
+\footnote{\url{https://scikit-learn.org/stable/modules/generated/sklearn.impute.KNNImputer.html}}.
+The KNN nearest neighbors algorithm imputes missing values by averaging values from the $n$ nearest
+neighbors. Two samples are designated to be close if the values of other features
+from that row that are not missing are close, measured with Euclidean distance.
+In all three datasets, the number of nearest neighbors, $n$, was chosen to be 3.
+It is recommended that the $n$ chosen is an odd number to avoid ties in choosing
+the nearest neighbor.
+
+After the imputation was performed, values were rounded so that encoded values
+could be converted back to categoricals and ordinals. For ordinal values, this
+was equivalent to rounding to the closest ordinal value. For the one-hot encoded
+categorical data, this was equivalent to choosing the largest value within the
+set of categories for each feature. If there were ties (two categories had
+values of 0.5), then all values for that row were set to 0 and the conversion
+chose the first category as the imputed value. After imputation was complete on
+those features that required it, the data which was not imputed was concatenated
+to the imputed data. Evaluation of the imputed dataset showed 100\% accuracy in
+imputing the observed (not missing) values in both attempts at imputation.
+
+
+\subsection{Model 1: Logistic Regression}
+
+The first model we used to predict an individual’s relation to mental health
+issues was logistic regression. There were two main variables we were
+interested in classifying:
+
+\begin{itemize}
+    \item Whether a person sought treatment
+    \item Whether a person had ever been diagnosed with a mental illness
+\end{itemize}
+
+The first was encoded in our datasets in a column called “sought\_treatment”,
+while the second was encoded as “ever\_diagnosed”. Both of these are boolean
+variables - where 1 represents True and 0 represents False.
+
+We decided to use \texttt{sklearn}’s functionality to help drive this logistic
+regression. In particular, we decided to use the \texttt{DictVectorizer} located
+in \texttt{sklearn.feature\_extraction}, and \texttt{LogisticRegression} from
+\texttt{sklearn.linear\_model} whose loss function is
+$$l_{logistic} = \sum -ylog(y') + (1-y)log(1-y')$$.
+
+In addition, to validate our results, we decided to run K-Fold cross-validation.
+We wanted to see whether the results we got from a simple one-time
+training-validation split (using \texttt{train\_test\_split} from
+\texttt{sklearn.model\_selection}) were more or less accurate and representative
+for the entire dataset. Since our dataset was not too large, we were also able
+to use Leave-One-Out cross-validation for maximum confirmation of accuracy.
+
+The features we attempted to fit on were as follows:
+
+\begin{enumerate}
+    \item Age
+    \item Country
+    \item State (if applicable)
+    \item Gender
+    \item Race
+    \item Family History
+    \item Whether one would talk about mental health with their friends and family.
+    \item Whether one works primarily in the tech industry or not
+    \item Whether one knows resources for mental health.
+    \item Why one would (or would not) bring up mental health in an interview.
+\end{enumerate}
+
+Encoding was done as follows:
+
+\begin{itemize}
+    \item Features 2 through 6 were one-hot encoded using \texttt{DictVectorizer} from \texttt{sklearn}
+    \item Gender was encoded with three categories: male, female, and non-binary using one-hot
+    \item Features 1, 7, and 9 were ordinal encoded
+    \item Age was already a discrete ordinal variable and was not transformed
+    \item Comfortability with talking to friends and family was on a scale from 0-10 and not transformed
+Knowledge about resources was encoded as follows: 0 = “No, I don’t know any”, 1 = “I know some”, and 2 = “Yes, I know several”
+    \item Feature 10 was converted from text to continuous values using \texttt{CountVectorizer}
+\end{itemize}
+
+We also did some data analysis / preprocessing using NLP tools. Using Google’s
+Universal Sentence Encoder, we decided to try and visually see if there were a lot
+of overlaps in similarity / meaning between different people’s responses for
+why they might bring up mental health in an interview, and why they might not,
+as that was the most prominent text-based field in our dataset, and we wanted to
+see if there could be similarities drawn between all of these responses, should
+they be helpful in classifying people into one category or another.
+
+
+
+\subsection{Model 2: Hinge Loss}
+
+We made a second attempt at fitting a model to classify whether or not a person
+has sought treatment for mental health, this time using Hinge Loss with Quadratic
+Regularization. We denote our input space, $X \in \mathbb{R}^{1525 \times n}$,
+where each row corresponds to a survey participant, and each column corresponds
+to one of the $n$ features we are using to make predictions.
+And our output space, $Y = \{1,0\}$, where
+
+\[ y_i = \begin{cases}
+      1 & \text{person has sought treatment} \\
+      0 & \text{otherwise} \\
+   \end{cases}
+\]
+
+Hinge loss enables us to determine a decision boundary and margins on the
+support vector to separate our predicted population of people who we expect to
+have sought treatment for mental health from those who have not. The loss
+function is specified as $\ell_{hinge}(x, y; w) = (1-yw^Tx)_+$. Notice that
+$\ell_{hinge}$ is 0 when $yw^Tx \geq 1$, and $\ell_{hinge}$ > 0 otherwise.
+Therefore, hinge loss does not penalize misclassified points that lie within
+the margin of the classification boundary.
+
+We leveraged SVMs (support vector machines) in \texttt{sklearn} to implement
+the regression analysis. We performed a random 80-20 split of the data to
+construct a training set, and a testing set. Below in the results section,
+you can find accuracy and F1 scores for models with various features chosen.
+Here we ignore the respondent’s demographic information to get a sense of how
+important a workplace’s organizational structure is in relating to someone’s
+mental health status.
+
+
+Our initial choice of X includes the following 15 features:
+
+\begin{enumerate}
+    \item Country they work in
+    \item Willingness to mention mental health in interview
+    \item Awareness of resources
+    \item Awareness of employee resources
+    \item Awareness of mental health benefits in contract
+    \item Willingness to discuss with coworkers
+    \item Willingness to discuss with supervisor
+    \item Whether it is easier to talk about Physical Health
+    \item Revealing mental health disorder to clients
+    \item Comfortability sharing information with family/friends
+    \item Number of employees
+    \item Witnessing negative consequences from discussing Mental Health
+    \item Has medical coverage
+    \item Works for a tech company
+    \item Works in a tech role
+\end{enumerate}
+
+
+\begin{itemize}
+    \item Feature 1 was encoded according to whether or not the survey
+    participant works in the United States. Therefore, if the participant
+    answered “United States of America”, the feature is transformed into a
+    1, and 0 otherwise.
+    \item Features 2 through 10, and 12 through 15 were encoded using a one-hot
+    boolean encoding such that 1 denotes the feature statement is true, and 0 to
+    denote the feature statement is false. For example, if someone responded ‘Yes”
+    to being aware of mental health resources, the feature was transformed to a 1.
+    “No” responses were transformed to a 0.
+    \item Feature 11 was transformed into ordinal values:
+    \begin{itemize}
+        \item 0 = small sized company with 1-5 employees or 6-25 employees
+        \item 1 = medium sized company with 100-500 employees or 500-1000 employees
+        \item 2 = large company with more than 1000 employees
+    \end{itemize}
+\end{itemize}
+
+We used $k$-cross validation again to confirm that our initial model results were
+reasonable. Notice in table ~\ref{table:hinge-loss-cv-performance}, the average
+train and test accuracies front the cross validation models are close to the
+performance of the initial model split. We now have confidence that the initial
+model split performance was not a coincidence.
+
+\begin{table}
+    \centering
+    \begin{tabular}{lrrr}
+        \hline \textbf{Model Type} & \textbf{Train Acc} & \textbf{Test Acc.} & \textbf{F1 Score} \\ \hline
+        80/20 Split & 0.701 & 0.652 & 0.745\\
+        5-fold CV & 0.681 & 0.660 & 0.736 \\
+        \hline
+    \end{tabular}
+    \caption{Performance of Hinge Loss on different datasets.
+    }
+    \label{table:hinge-loss-cv-performance}
+\end{table}
+
+\section{Results}
+
+\subsection{Model 1}
+
+In assessing our models, we decided to first use the field for “sought\_treatment”
+as the basis for what we would do our classification on, where 1 represents that
+the individual sought treatment, and 0 represents that they did not.
+
+We used two main metrics: exact match accuracy and F1. Exact match accuracy is
+the percentage of the predicted y-values that match the actual y-values. F1 is
+an average of precision and recall.
+
+When splitting our data, we used an 80/20 train/validation split.
+
+The results can be found in table ~\ref{table:lr-performance}
+
+\begin{table}[t]
+    \centering
+    {\footnotesize
+    \begin{tabular}{lrrr}
+        \hline \thead{Num} & \thead{Model Features} & \textbf{Test Acc.} & \textbf{F1 Score} \\ \hline
+        \makecell{1.1} & \makecell{Baseline: Age, Country, Gender} & \makecell{0.726} & \makecell{0.841} \\
+        \makecell{1.2} & \makecell{Age, Country, Gender, Race} & \makecell{0.721} & \makecell{0.838} \\
+        \makecell{1.3} & \makecell{Age, Country, Gender, Family History} & \makecell{0.695} & \makecell{0.799} \\
+        \makecell{1.4} & \makecell{Age, Country, Gender, Race, Family History} & \makecell{0.695} & \makecell{0.799} \\
+        \makecell{1.5} & \makecell{Age, Country, Gender, Race, Family History, \\ Discussing MH in interview} & \makecell{0.732} & \makecell{0.819} \\
+        \makecell{1.6} & \makecell{Age, Country, Gender, Race, \\ Family History, Discussing MH in interview / \\ Share with Friends and Family} & \makecell{\textcolor{GoodGreen}{0.742}} & \makecell{\textcolor{GoodGreen}{0.824}} \\
+        \makecell{1.7} & \makecell{Age, Country, Gender, Race, \\ Family History, Discussing MH in interview / \\ Share with Friends and Family, Primarily Tech} & \makecell{\textcolor{GoodGreen}{0.742}} & \makecell{\textcolor{GoodGreen}{0.824}} \\
+        \hline
+    \end{tabular}}
+    \caption{
+        Performance of Logistic Regression with different feature sets.
+    }
+    \label{table:lr-performance}
+\end{table}
+
+Next, we decided to run the data using Leave-One-Out cross validation on our
+most complicated model to see the effects of running our model on different
+datasets to see if we could further validate our model and see if we could
+achieve better performance with a different dataset. We found that by doing so,
+our mean exact match score over all different models trained was 0.749 and our
+mean F1 score was 0.616. The exact match improving after using LOO was to be expected,
+as it allowed us to try all sorts of datasets, some of which might produce models
+with parameters that better represented the underlying data. However, the mean F1
+score dropping significantly was somewhat surprising. We chalk this up to
+calculating F1 over the validation set. With the validation set size being 1,
+this means the precision and recall that make up the F1 score are going to be very
+binary (either 0 or 1), so this makes maintaining an accurate representation of
+the actual F1 score over many trials difficult, hence why the value decreased
+significantly.
+
+Next, we decided to run $k$-Fold Cross validation with k=50 different splits.
+When we ran this, we found that our mean exact match score was 0.748, similar
+to the previous step, and our mean F1 score was 0.842, much better than the
+previous LOO model. This is not surprising. Like the LOO model, K-fold cross
+validation can find the best model over many different options with underlying datasets,
+making it easier to find the best model for the data. The exact match score was
+marginally lower than previously, since it had fewer datasets to run its trials over.
+However, the F1 score was much better and in line with our thoughts.
+
+When we plotted a histogram of our exact match accuracies after each trial, we
+ended up with figure ~\ref{fig:exact_match_lr_hist}, and we can see that around
+0.7 seems to be the most common accuracy, and our histogram is somewhat left-skewed.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{exact_match_lr_hist.png}
+    \caption{Exact match histogram across different cross validation datasets.}
+    \label{fig:exact_match_lr_hist}
+\end{figure}
+
+\subsubsection{Side note: ever\_diagnosed}
+We also tried running our model to predict whether someone was ever diagnosed
+with a mental illness. However, when we did so, we realized that this would be
+a difficult task, as around 99\% of the entries are “yes” and the rest are “no”.
+Although it is somewhat discouraging that our data is so incredibly skewed in one
+direction, it makes sense - people who have been diagnosed with mental illness
+are more likely to care about mental illness and the issues that surround it, so
+they would be more likely to fill out a survey directly pertaining to mental health issues.
+
+When we ran this fitting, we found that we received a mean accuracy score of
+0.986 and a mean F1 score of 0.993 over the validation set. However, we cannot
+rejoice at this seemingly incredibly high accuracy classification. The fact that
+the data was incredibly skewed means that it is incredibly easy for a model to
+simply output all “yes”s for every single entry and still get an incredibly high
+accuracy score.
+
+
+We decided to include analysis on the short-answer responses for why someone
+might (or might not) mention mental health in an interview. We did this to include
+the overall pattern of responses as a feature in the model. A heatmap of a
+subset of the entries is shown in Figure ~\ref{fig:similarity_heatmap}.
+
+% TODO: Is this too small? Move to appendix?
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{similarity_heatmap.png}
+    \caption{Heatmap of similarities between sample sentences in the dataset.}
+    \label{fig:similarity_heatmap}
+\end{figure}
+
+From here, we can see that most of the similarities are mid-range, even though
+they all end up with a similar theme. This makes sense, as it is somewhat taboo
+of a subject to talk about when you are trying to portray yourself in the best
+possible light. A histogram of similarities between all entries removing
+similarities of a response with itself is shown in Figure ~\ref{fig:similarity_hist}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{similarity.png}
+    \caption{Histogram of similarities between sentences.}
+    \label{fig:similarity_hist}
+\end{figure}
+
+Figure ~\ref{fig:similarity_hist} has a right-skewed distribution, with the
+majority of similarities seem to be sitting around 0.2. When calculating statistics,
+we found that the mean similarity was 0.183, the max similarity was 0.837,
+and the standard deviation of similarity was 0.156.
+
+\subsection{Model 2}
+
+\begin{table*}[t]
+    \centering
+    {
+        \begin{tabular}{lrrrr}
+        \hline \thead{Num} & \thead{Model Features} & \textbf{Train Acc.} & \textbf{Test Acc.} & \textbf{F1 Score} \\ \hline
+        \makecell{2.1} & \makecell{Features 1 through 15} & \makecell{0.665} & \makecell{0.685} & \makecell{0.768} \\
+
+
+        \makecell{2.2} & \makecell{Willingness to discuss Mental Health \\ (Features 2, and 6 through 10)} & \makecell{0.695} & \makecell{0.694} & \makecell{0.778} \\
+        \makecell{2.3} & \makecell{Accessibility: Awareness of resources \\ and access to mental health coverage \\ (Features 3, 4, 5, and 13)} & \makecell{0.619} & \makecell{0.622} & \makecell{0.766} \\
+        \makecell{2.4} & \makecell{Company Type: country, size, tech or non-tech \\ (Features 1, 11, 14, 15)} & \makecell{0.642} & \makecell{0.635} & \makecell{0.717} \\
+        \makecell{2.5} & \makecell{Model 2 + 3 (Features 2, 4-10, 13)} & \makecell{\textcolor{GoodGreen}{0.699}} & \makecell{\textcolor{GoodGreen}{0.698}} & \makecell{\textcolor{GoodGreen}{0.779}} \\
+        \hline
+    \end{tabular}
+    }
+    \caption{
+        Predicting whether someone sought treatment (Hinge Loss With Quadratic Regularization)
+    }
+    \label{table:hinge-performance}
+\end{table*}
+
+
+The Hinge Loss model was tested with five combinations of features, denoted in
+the table above. The feature combinations were selected to reflect themes including:
+
+\begin{itemize}
+    \item Someone's willingness to discuss mental health
+    \item Their accessibility to mental health resources
+    \item Their company type and size
+\end{itemize}
+
+So for example, the “Willingness to discuss Mental Health” feature set includes
+data about comfortability discussing mental health with friends, family,
+co-workers, supervisors, and in an interview. The combination of accessibility
+and willingness features proved to be the most effective model, yielding
+approximately 70\% classification accuracy. This is unsurprising that being able
+to talk about mental health without worrying about negative repercussions, and being
+able to access services to support mental health are good predictors for knowing
+whether or not someone is suffering from a mental health concern.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{hinge_loss_coeffs_1.png}
+    \caption{Hinge Loss coefficients on the first imputed dataset.}
+    \label{fig:hinge_loss_coeffs_1}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{hinge_loss_coeffs_2.png}
+    \caption{Hinge Loss coefficients on the second imputed dataset.}
+    \label{fig:hinge_loss_coeffs_2}
+\end{figure}
+
+\section{Discussion}
+
+\subsection{Model 1}
+\subsubsection{Logistic Regression}
+
+In the logistic regression model, we found that the first few models actually
+underfit the data, as there was not enough information to make meaningful predictions.
+The last model that utilized all the features resulted in decent overfitting of the
+data since the training accuracy was about 15\% higher than the testing accuracy.
+Playing around with the transformations led to a middle model (containing age,
+country, race, gender, and family history) that only slightly overfit the training
+data by about 2\%. Whether the full model’s overfitting is an acceptable margin of
+overfitting depends on the context in which this data will be used. We suspect the
+use of \texttt{CountVectorizer} made it easier to overfit the training data,
+since the data was sparse and the responses were each fairly short. This made it
+difficult to generalize the text field given the other features included.
+
+\subsection{Model 2}
+
+In the hinge loss model, quadratic regularization was applied to add a penalty
+for respondents who were outliers. Using all 15 features resulted in slight
+overfitting of the data since the training accuracy was about 2\% higher than
+the testing accuracy. We experimented with different feature configurations,
+using just four features for Model 2.3 resulted in slight underfitting since
+the training accuracy is slightly lower than the testing accuracy. Using between
+5 and 9 features reduced the overfitting and underfitting and yielded nearly
+equivalent accuracies for the training and testing sets (see Model 2.2 and 2.5).
+Model 2.5, which yielded the highest average prediction accuracy, had a 0.1\%
+difference between training and testing accuracy. On another note, since the
+dataset only included about 1500 participants, we suspect the small amount of
+data to cause such an ideal margin. In the end, the best test accuracy score
+achieved with reasonable avoidance of over and underfitting was 0.698.
+
+
+
+\subsection{Synthesis}
+
+Overall, our models and the data suggest that the culture of a workplace has an
+impact on workers’ propensity to reach out for professional help. The features
+addressing employees’ \textbf{willingness to speak} about their mental health
+and their \textbf{awareness of mental health resources} had larger coefficients
+compared to others, and models which included these features outperformed other
+models. Although this outperformance is slight, the take-home message remains
+relevant as something for employers to consider. More data would be necessary
+to get more distinct proof, and we hope that this survey continues to be
+distributed yearly to continue work in this important field.
+
+We are somewhat confident in our results, but the number of samples in our dataset
+is not large enough that we would be confident in using this model in a production
+setting. A good amount of the data was missing and had to be imputed, and there
+were not enough rows to begin with to build a model that could generalize well
+over all possible cases. We expect  people who filled out this survey to be people
+who were more passionate about mental health causes, so the survey responses
+reflected this. Responses  tended to be more skewed towards people who had gone
+out and sought treatment or had already been diagnosed with mental illnesses.
+If we had a much larger dataset with tens of thousands of examples that was more
+accurately sampled over the entire population, rather than having a small sample
+of those who are more invested in the causes fill it out on their own volition,
+we could build a model that we would be more confident in deploying to production
+and use in the real world. For the time being, however, we are not willing to make
+any claims of such.
+
+Although this model does not have the ability to force someone to get treatment,
+in the hands of certain employers this model could have a negative impact on
+potential employees, suggesting that this model could theoretically be used as a
+weapon of math destruction. For example, if a potential employee is being interviewed
+for a new position, and the model indicates that the employee is predicted to seek
+treatment for mental health issues, the employer may decide against hiring them for
+fear that they may have mental health issues. Even with a more accurate model, having
+potential or current employers be unwilling to speak to their employees about mental
+health could have negative consequences for those suffering with these illnesses.
+
+
+\section{Conclusion}
+Predicting the propensity of workers in the tech industry towards reaching out for
+help with mental illnesses could help reach individuals who are quietly suffering
+to lead them to professional help. Using survey data from OSMI which was imputed
+using KNN nearest neighbors imputation, we utilized natural language processing,
+logistic regression, and Hinge regression to find the best prediction which reached
+close to 75\% accurate. A lack of data, including many missing fields in the surveys,
+was a limitation of this study. In the future, for companies looking to improve their
+culture and take care of their employees, it could be useful to de-stigmatize mental
+health through group discussions, explicit advertisement of resources, and leadership
+from a supervisor to encourage these changes.
+
+\end{document}
